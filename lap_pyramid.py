@@ -9,14 +9,16 @@ class lap_pyramid():
 														 [0.0125, 0.0625, 0.1000, 0.0625, 0.0125],
 														 [0.0025, 0.0125, 0.0200, 0.0125, 0.0025]], 
 	  				   				  					 (5, 5, 1, 1)), 
-				strides=[1, 2, 2, 1], padding='VALID'):
+				strides=[1, 2, 2, 1], padding='VALID', loss = False):
 		self.k = k
 		self.kernel = kernel
+		self.loss = loss
 		self.strides = strides
 		self.padding = padding
 		self.image_size = image_size
 		self.dn_filts, self.sigmas = self.DN_filters()
-		self.build_model()
+		if not self.loss:
+			self.build_model()
 
 	# Self pad to prevent a lot of zero padding - also using 'SYMMETRIC'
 	def pad(self, image, pad=1, method="CONSTANT"):
@@ -67,18 +69,26 @@ class lap_pyramid():
 			norm.append(convs[i] / (self.sigmas[i] + n))
 		return norm
 
-	def convs(self):
-		J = self.im
+	def convs(self, im):
+		J = im
 		pyr = []
 		for i in range(0, self.k-1):
-			I = tf.nn.conv2d(self.pad(J, pad=2), self.w, strides=self.strides, padding=self.padding)
+			I = tf.nn.conv2d(self.pad(J, pad=2), self.kernel, strides=self.strides, padding=self.padding)
 			I_up = tf.image.resize_images(I, [int(np.ceil(self.image_size[0]/(2**i))), 
 				int(np.ceil(self.image_size[1]/(2**i)))])
-			I_up_conv = tf.nn.conv2d(self.pad(I_up, pad=2), self.w, strides=[1, 1, 1, 1], padding=self.padding)
+			I_up_conv = tf.nn.conv2d(self.pad(I_up, pad=2), self.kernel, strides=[1, 1, 1, 1], padding=self.padding)
 			pyr.append(J - I_up_conv)
 			J = I
 		pyr.append(J)
 		return self.normalise(pyr)
+
+	def loss_function(self, real, pred):
+		realpyr = self.convs(real)
+		predpyr = self.convs(pred)
+		total = tf.convert_to_tensor(0, dtype=tf.float32)
+		for i in range(0, self.k):
+			total = tf.add(total, tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(realpyr[i], predpyr[i])))))
+		return tf.divide(total, tf.convert_to_tensor(self.k, dtype=tf.float32))
 
 	def forward(self, image):
 		convs_out, convs_up_out = self.sess.run([self.convs_, self.convs_up_], 
@@ -99,7 +109,6 @@ class lap_pyramid():
 
 	def build_model(self):
 		self.im = tf.placeholder('float32', [1, None, None, 1])
-		self.w = tf.get_variable('w', initializer=tf.to_float(self.kernel))
 		self.convs_up_ = self.convs()
 		self.sess = tf.Session()
 		self.sess.run(tf.global_variables_initializer())

@@ -69,7 +69,20 @@ class lap_pyramid():
 			norm.append(convs[i] / (self.sigmas[i] + n))
 		return norm
 
-	def convs(self, im):
+	def convs(self):
+		J = self.im
+		pyr = []
+		for i in range(0, self.k-1):
+			I = tf.nn.conv2d(self.pad(J, pad=2), self.kernel, strides=self.strides, padding=self.padding)
+			I_up = tf.image.resize_images(I, [int(np.ceil(self.image_size[0]/(2**i))), 
+				int(np.ceil(self.image_size[1]/(2**i)))])
+			I_up_conv = tf.nn.conv2d(self.pad(I_up, pad=2), self.kernel, strides=[1, 1, 1, 1], padding=self.padding)
+			pyr.append(J - I_up_conv)
+			J = I
+		pyr.append(J)
+		return self.normalise(pyr)
+
+	def convs_loss_function(self, im):
 		J = im
 		pyr = []
 		for i in range(0, self.k-1):
@@ -83,8 +96,8 @@ class lap_pyramid():
 		return self.normalise(pyr)
 
 	def loss_function(self, real, pred):
-		realpyr = self.convs(real)
-		predpyr = self.convs(pred)
+		realpyr = self.convs_loss_function(real)
+		predpyr = self.convs_loss_function(pred)
 		total = tf.convert_to_tensor(0, dtype=tf.float32)
 		for i in range(0, self.k):
 			total = tf.add(total, tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(realpyr[i], predpyr[i])))))

@@ -4,11 +4,11 @@ import numpy as np
 class lap_pyramid():
 
 	def __init__(self, k, image_size, kernel=np.reshape([[0.0025, 0.0125, 0.0200, 0.0125, 0.0025],
-		  												 [0.0125, 0.0625, 0.1000, 0.0625, 0.0125],
+														 [0.0125, 0.0625, 0.1000, 0.0625, 0.0125],
 														 [0.0200, 0.1000, 0.1600, 0.1000, 0.0200],
 														 [0.0125, 0.0625, 0.1000, 0.0625, 0.0125],
 														 [0.0025, 0.0125, 0.0200, 0.0125, 0.0025]], 
-	  				   				  					 (5, 5, 1, 1)), 
+														 (5, 5, 1, 1)),
 				strides=[1, 2, 2, 1], padding='VALID', loss = False):
 		self.k = k
 		self.kernel = kernel
@@ -25,42 +25,42 @@ class lap_pyramid():
 		return tf.pad(image, [[0, 0], [pad, pad], [pad, pad], [0, 0]], method)
 
 	def DN_filters(self):
-    # These parameters were learned using the McGill dataset
-    # Training_NLP_param.m
-	    sigmas = [0.0248, 0.0185, 0.0179, 0.0191, 0.0220, 0.2782]
-	    dn_filts = []
+	# These parameters were learned using the McGill dataset
+	# Training_NLP_param.m
+		sigmas = [0.0248, 0.0185, 0.0179, 0.0191, 0.0220, 0.2782]
+		dn_filts = []
 
-	    dn_filts.append(np.reshape([[0,      0.1011, 0     ],
-	                     			[0.1493, 0,      0.1460],
-	                     			[0,      0.1015, 0.    ]],
-	    							(3, 3, 1, 1)))
+		dn_filts.append(np.reshape([[0,      0.1011, 0     ],
+									[0.1493, 0,      0.1460],
+									[0,      0.1015, 0.    ]],
+									(3, 3, 1, 1)))
 
-	    dn_filts.append(np.reshape([[0,      0.0757, 0     ],
-	                     			[0.1986, 0,      0.1846],
-	                     			[0,      0.0837, 0     ]],
-	    							(3, 3, 1, 1)))
+		dn_filts.append(np.reshape([[0,      0.0757, 0     ],
+									[0.1986, 0,      0.1846],
+									[0,      0.0837, 0     ]],
+									(3, 3, 1, 1)))
 
-	    dn_filts.append(np.reshape([[0,      0.0477, 0     ],
-	                     			[0.2138, 0,      0.2243],
-	                     			[0,      0.0467, 0     ]],
-	    							(3, 3, 1 ,1)))
+		dn_filts.append(np.reshape([[0,      0.0477, 0     ],
+									[0.2138, 0,      0.2243],
+									[0,      0.0467, 0     ]],
+									(3, 3, 1 ,1)))
 
-	    dn_filts.append(np.reshape([[0,      0,      0     ],
-	                     			[0.2503, 0,      0.2616],
-	                     			[0,      0,      0     ]],
-	    							(3, 3, 1, 1)))
+		dn_filts.append(np.reshape([[0,      0,      0     ],
+									[0.2503, 0,      0.2616],
+									[0,      0,      0     ]],
+									(3, 3, 1, 1)))
 
-	    dn_filts.append(np.reshape([[0,      0,      0     ],
-	                     			[0.2598, 0,      0.2552],
-	                     			[0,      0,      0     ]],
-	    							(3, 3, 1, 1)))
+		dn_filts.append(np.reshape([[0,      0,      0     ],
+									[0.2598, 0,      0.2552],
+									[0,      0,      0     ]],
+									(3, 3, 1, 1)))
 
-	    dn_filts.append(np.reshape([[0,      0,      0    ],
-	                     			[0.2215, 0,      0.0717],
-	                     			[0,      0,      0   ]],
-	    							(3, 3, 1 ,1)))
+		dn_filts.append(np.reshape([[0,      0,      0    ],
+									[0.2215, 0,      0.0717],
+									[0,      0,      0   ]],
+									(3, 3, 1 ,1)))
 
-	    return dn_filts, sigmas
+		return dn_filts, sigmas
 
 	def normalise(self, convs):
 		norm = []
@@ -114,7 +114,6 @@ class lap_pyramid():
 		convs_up_out2 = self.sess.run(self.convs_up_, feed_dict={self.im:image2})
 		convs_up_out1r = [np.squeeze(x) for x in convs_up_out1]
 		convs_up_out2r = [np.squeeze(x) for x in convs_up_out2]
-		print(convs_up_out1[0].mean())
 		rmse = []
 		for i in range(0, self.k):
 			rmse.append(np.sqrt(np.mean((convs_up_out1[i]-convs_up_out2[i])**2)))

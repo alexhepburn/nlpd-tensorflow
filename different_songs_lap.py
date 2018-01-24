@@ -4,17 +4,22 @@ import librosa
 import os
 import glob
 import pandas as pd
+from tqdm import tqdm
+from scipy.spatial import distance
+import networkx as nx
 
-df = pd.DataFrame(columns=['Album', 'Song', 'Pyramid'])
+from bokeh.io import show, output_file
+from bokeh.plotting import figure
+from bokeh.models.graphs import from_networkx
+from bokeh.models.sources import ColumnDataSource
+from bokeh.models import Plot, MultiLine, Circle
+from bokeh.models import GraphRenderer, Oval
+from bokeh.palettes import Set3
 
-flac_path = audio_path = '/Users/ah13558/Documents/flac/'
-base_y, base_sr = librosa.load(flac_path+"base.flac", duration=12.0)
-folders = (glob.glob(audio_path + "*/"))
-base_stft = librosa.core.stft(y=base_y)
-base_stft = np.vstack((base_stft.real, base_stft.imag))
-stft_shape = base_stft.shape
-base_stft = np.reshape(base_stft, (1, stft_shape[0], stft_shape[1], 1))
-lap = lap_pyramid(6, stft_shape)
+
+import time
+
+set3 = Set3[12]
 
 def stft_reshape(f):
 	y, sr = librosa.load(files[i], duration=12.0)
@@ -23,37 +28,55 @@ def stft_reshape(f):
 	stft = np.reshape(stft, (stft_shape[0], stft_shape[1], 1))
 
 def calc_rmse(l1, l2):
-	rmse = []
-	for i in range(0, self.k):
-            rmse.append(np.sqrt(np.mean((convs_up_out1[i] - convs_up_out2[i]) ** 2)))
-    return mean(rmse)
+	rmse = [np.sqrt(np.mean((x - y) ** 2)) for (x, y) in zip(l1, l2)]
+	return np.mean(rmse)
 
-pyramid_dict = {}
-for fold in folders[0:1]:
-	temp_dict = {}
-	multiple_stft = []
-	files = glob.glob(fold + "*.flac")
-	multiple_stft = np.ones((len(files), stft_shape[0], stft_shape[1], 1))
-	# Prepare files for batch processing to get the laplacian pyramids for each
-	# song.
-	for i in range(0, len(files)):
-		y, sr = librosa.load(files[i], duration=12.0)
-		stft = librosa.core.stft(y=y)
-		stft = np.vstack((stft.real, stft.imag))
-		stft = np.reshape(stft, (stft_shape[0], stft_shape[1], 1))
-		multiple_stft[i, :, :, :] = stft
-	# Computer laplacian pyramid for batch
-	pyramids = lap.output_pyramid(multiple_stft)
-	# Sort batch into a album of dictionaries which contain a dictionary for songs
+def stack_stft(path, dur, shape):
+	y, sr = librosa.load(path, duration=dur)
+	stft = librosa.core.stft(y=y)
+	stft = reshape(np.vstack((stft.real, stft.img)), (shape[0], shape[1], 1))
+	return stft
+
+def create_pyramid_dataframe(path, lap):
+	# Batch process songs for STFT and Laplacian Pyramid Distance
+	folders = (glob.glob(path + "*/"))
+	df = pd.DataFrame(columns=['Album', 'Song', 'Pyramid'])
+	stft_shape = lap.image_size
+	raw_audio = []
+	files = [item for sublist in [glob.glob(f+"*.flac") for f in folders] \
+		for item in sublist]
+	raw_audio = np.asarray([librosa.load(x, duration=12.0)[0] for x in files])
+	# Calculates STFT and resulting Pyramid
+	pyramids = lap.output_pyramid_raw_audio(np.asarray(raw_audio))
 	for i in range(0, len(files)):
 		pyr = []
-		# Collect all pyramids in a list for each song
 		for k in range(0, len(pyramids)):
 			pyr.append(pyramids[k][i])
-		# Store pyramids as values and song names as keys
-		df['Song'] = files[i].split(os.sep)[-1]
-		df['Album'] = fold.split(os.sep)[-2]
-		df['Pyramid'] = pyr
-		print(fold.split(os.sep)[-2] + " DONE: " + str(len(files)) + " FILES FOUND")
+		splt = files[i].split(os.sep)
+		df = df.append({'Song':splt[-1], 'Album':splt[-2], 'Pyramid':pyr}, ignore_index=True)
+	album = pd.Series(df['Album']).astype('category')
+	album_number = album.cat.codes
+	df['Album Number'] = album_number
+	return df
 
-print(df)
+if __name__ == "__main__":
+	start_time = time.time()
+	flac_path = '/Users/ah13558/Documents/flac/'
+	base_y, base_sr = librosa.load(flac_path+"base.flac", duration=12.0)
+	lap = lap_pyramid(6, [2050, 513])
+	df = create_pyramid_dataframe(flac_path, lap)
+	scores = distance.cdist(list(df['Pyramid']), list(df['Pyramid']), metric=calc_rmse)
+
+	# Create graph
+	colors = [set3[x] for x in list(df['Album Number'])]
+	plot = figure(title="LAPD Songs", x_range=(-1.1,1.1), y_range=(-1.1,1.1), 
+		plot_width=800, plot_height=800)
+	G = nx.from_numpy_matrix(scores)
+	graph_renderer = from_networkx(G, nx.spring_layout)
+	graph_renderer.node_renderer.data_source.add(colors, 'fillcolor')
+	graph_renderer.node_renderer.glyph = Circle(size=15, fill_color='fillcolor')
+	graph_renderer.edge_renderer.glyph = MultiLine(line_color="#CCCCCC", line_alpha=0.8, line_width=2)
+	plot.renderers.append(graph_renderer)
+	output_file("song_graph.html")
+	print("--- %s seconds ---" % (time.time()-start_time))
+	show(plot)

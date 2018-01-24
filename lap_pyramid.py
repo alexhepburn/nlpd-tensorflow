@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-
+import functools
 
 class lap_pyramid():
 
@@ -120,13 +120,27 @@ class lap_pyramid():
             rmse.append(np.sqrt(np.mean((convs_up_out1[i] - convs_up_out2[i]) ** 2)))
         return np.mean(rmse)
 
-    def output_pyramid(self, im):
-        convs = self.sess.run(self.convs_up_, feed_dict={self.im: im})
+    def calc_stft(self):
+        return tf.contrib.signal.stft(self.raw_audios, frame_length=2048, frame_step=512, 
+            window_fn=functools.partial(tf.contrib.signal.hann_window, periodic=False))
+
+    def stack_fft(self, stft):
+        out = stft.transpose()
+        out = np.vstack((out.real, out.imag))
+        out = np.reshape(out, (out.shape[0], out.shape[1], 1))
+        return out
+
+    def output_pyramid_raw_audio(self, raw_audio):
+        stfts = self.sess.run(self.stft_, feed_dict={self.raw_audios: raw_audio})
+        stfts_reshape = np.asarray([self.stack_fft(x) for x in stfts])
+        convs = self.sess.run(self.convs_up_, feed_dict={self.im: stfts_reshape})
         convs = [np.squeeze(x) for x in convs]
         return convs
 
     def build_model(self):
         self.im = tf.placeholder('float32', [None, None, None, 1])
+        self.raw_audios = tf.placeholder('float32', [None, None])
         self.convs_up_ = self.convs()
+        self.stft_ = self.calc_stft()
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())

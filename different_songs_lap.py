@@ -21,30 +21,15 @@ import time
 
 set3 = Set3[12]
 
-def stft_reshape(f):
-	y, sr = librosa.load(files[i], duration=12.0)
-	stft = librosa.core.stft(y=y)
-	stft = np.vstack((stft.real, stft.imag))
-	stft = np.reshape(stft, (stft_shape[0], stft_shape[1], 1))
-
 def calc_rmse(l1, l2):
 	rmse = [np.sqrt(np.mean((x - y) ** 2)) for (x, y) in zip(l1, l2)]
 	return np.mean(rmse)
 
-def stack_stft(path, dur, shape):
-	y, sr = librosa.load(path, duration=dur)
-	stft = librosa.core.stft(y=y)
-	stft = reshape(np.vstack((stft.real, stft.img)), (shape[0], shape[1], 1))
-	return stft
-
 def create_pyramid_dataframe(path, lap):
 	# Batch process songs for STFT and Laplacian Pyramid Distance
-	folders = (glob.glob(path + "*/"))
 	df = pd.DataFrame(columns=['Album', 'Song', 'Pyramid'])
-	stft_shape = lap.image_size
-	raw_audio = []
-	files = [item for sublist in [glob.glob(f+"*.flac") for f in folders] \
-		for item in sublist]
+	files = [item for sublist in [glob.glob(f+"*.flac") 
+		for f in (glob.glob(path + "*/"))] for item in sublist]
 	raw_audio = np.asarray([librosa.load(x, duration=12.0)[0] for x in files])
 	# Calculates STFT and resulting Pyramid
 	pyramids = lap.output_pyramid_raw_audio(np.asarray(raw_audio))

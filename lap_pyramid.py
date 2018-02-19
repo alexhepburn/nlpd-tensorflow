@@ -121,7 +121,7 @@ class lap_pyramid():
         return np.mean(rmse)
 
     def calc_stft(self):
-        return tf.contrib.signal.stft(self.raw_audios, frame_length=2048, frame_step=512, 
+        return tf.contrib.signal.stft(self.raw_audios, frame_length=2048, frame_step=512,
             window_fn=functools.partial(tf.contrib.signal.hann_window, periodic=False))
 
     def stack_fft(self, stft):
@@ -134,6 +134,11 @@ class lap_pyramid():
         stfts = self.sess.run(self.stft_, feed_dict={self.raw_audios: raw_audio})
         stfts_reshape = np.asarray([self.stack_fft(x) for x in stfts])
         convs = self.sess.run(self.convs_up_, feed_dict={self.im: stfts_reshape})
+        convs = [np.squeeze(x) for x in convs]
+        return convs
+
+    def output(self, reshaped_tensors):
+        convs = self.sess.run(self.convs_up_m, feed_dict={self.im: reshaped_tensors})
         convs = [np.squeeze(x) for x in convs]
         return convs
 
